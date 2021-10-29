@@ -131,7 +131,7 @@ class Strand:
 
         :returns fraction of sequence containing G or C
         """
-        return (self.sequence.count("G") + self.sequence.count("C"))/len(self.sequence)
+        return (self.sequence.count("G") + self.sequence.count("C")) / len(self.sequence)
 
     def count_bases(self, base="ACGT"):
         """"
@@ -240,25 +240,15 @@ def get_strands(filename="input.txt"):
 
     :returns list of all strands
     """
-    file = open(filename, "r")
     strands = []
 
-    buffer_title = ""
-    buffer_data = ""
-    for line in file:
-        line = line.strip()
-        if line == "":
-            continue
+    with open(filename, "r") as file:
+        entries = [entry.split("\n") for entry in file.read().split(">")[1:]]
 
-        if line.startswith(">"):
-            if buffer_title != "":
-                strands.append(Strand(buffer_data, buffer_title))
-            buffer_data = ""
-            buffer_title = line.strip(">")
-        else:
-            buffer_data += line
-
-    strands.append(Strand(buffer_data, buffer_title))
+    for entry in entries:
+        label = entry[0]
+        data = "".join(entry[1:])
+        strands.append(Strand(data, label))
 
     return strands
 
@@ -273,17 +263,14 @@ def read_file(filename="input.txt", crosses_lines=False):
     :returns list of all strands
     """
     strands = []
+
     with open(filename, "r") as file:
-        buffer_data = ""
-        for line in file.readlines():
-            if crosses_lines is True:
-                if line.strip() == "":
-                    strands.append(Strand(buffer_data))
-                    buffer_data = ""
-                else:
-                    buffer_data += line.strip()
-            else:
-                if line.strip() != "":
-                    strands.append(Strand(line.strip()))
+        entries = [entry.split("\n") for entry in file.read().split("\n\n")]
+
+    if not crosses_lines:
+        strands = [Strand(strand) for strand in entries[0]]
+    else:
+        for entry in entries:
+            strands.append(Strand("".join(entry)))
 
     return strands
