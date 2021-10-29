@@ -1,6 +1,6 @@
 from DNA import *
 
-strands = get_strands()
+strands = read_fasta_file()
 
 lengths = [_.gc_amount() for _ in strands]
 max_index = lengths.index(max(lengths))

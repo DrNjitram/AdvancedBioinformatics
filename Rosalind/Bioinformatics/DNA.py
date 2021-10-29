@@ -232,7 +232,7 @@ def hamming_distance(strand1: Strand, strand2: Strand):
     return result
 
 
-def get_strands(filename="input.txt"):
+def read_fasta_file(filename="input.txt"):
     """
     Returns a list of all sequences in the provided fasta format file as Strands
 
