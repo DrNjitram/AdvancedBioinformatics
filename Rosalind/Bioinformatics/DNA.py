@@ -74,9 +74,20 @@ class Strand:
         self.protein = protein
 
     def reverse(self):
-        return self.sequence[::-1]
+        """"
+        Reverses the sequence
+
+        :returns reversed sequence
+        """
+        self.sequence = self.sequence[::-1]
+        return self.sequence
 
     def flip(self):
+        """"
+        Flips the sequence from RNA to DNA and vice versa
+
+        :returns flipped sequence
+        """
         if self.raw_type == "DNA":
             self.raw_type = "RNA"
             self.sequence = self.sequence.replace("T", "U")
@@ -84,22 +95,61 @@ class Strand:
             self.raw_type = "DNA"
             self.sequence = self.sequence.replace("U", "T")
 
-    def complement(self):
+        return self.sequence
+
+    def get_complement(self):
+        """
+        Get the complemented string
+        Does not modify sequence
+
+        :returns complement of sequence
+        """
         if self.raw_type == "DNA":
             return "".join(["A" if char == "T" else "T" if char == "A" else "C" if char == "G" else "G" for char in self.sequence])
         else:
             return "".join(["A" if char == "U" else "U" if char == "A" else "C" if char == "G" else "G" for char in self.sequence])
 
-    def reverse_complement(self):
-        return self.complement()[::-1]
+    def get_reverse_complement(self):
+        """"
+        Get the reversed complement
+        does not modify sequence
+
+        :returns reverse complement of sequence
+        """
+        return self.get_complement()[::-1]
 
     def shift(self, amount=1):
+        """
+        Shift sequence by basepairs
+        Used to obtain orf's
+        """
         self.sequence = self.sequence[-amount:] + self.sequence[:-amount]
 
     def gc_amount(self):
+        """
+        Calculate the GC amount
+
+        :returns fraction of sequence containing G or C
+        """
         return (self.sequence.count("G") + self.sequence.count("C"))/len(self.sequence)
 
+    def count_bases(self, base="ACGT"):
+        """"
+        :param base base pairs to obtain info from, default = "ACGT"
+
+        :returns list with counts of A, C, G, T
+        """
+        all_bases = "ACGT"
+        return [self.sequence.count(code) for code in all_bases if code in base]
+
     def to_protein(self, include_stop=False):
+        """
+        Create protein from the current sequence
+        Will convert to RNA if type is DNA using flip()
+        :param include_stop Will print out 'Stop' for stop codons. Otherwise will discard them
+
+        :returns protein sequence
+        """
         if self.raw_type == "DNA":
             self.flip()
             return self.to_protein(include_stop)
@@ -110,10 +160,14 @@ class Strand:
             return self.protein
 
     def get_frames(self):
-        if self.protein == "":
-            self.to_protein(True)
+        """
+        Obtain all reading frames from the current sequence when converted to protein.
+        Will return 3 frames (does not include reverse complement frames)
 
-        frames = self.protein.split("Stop")[:-1]
+        :returns three frames
+        """
+
+        frames = self.to_protein(True).split("Stop")[:-1]
         self.shift()
         frames += self.to_protein(True).split("Stop")[:-1]
         self.shift()
@@ -130,9 +184,22 @@ class Strand:
         return result
 
     def get_orfs(self):
-        return set(self.get_frames() + Strand(self.reverse_complement()).get_frames())
+        """
+        Obtain all reading open frames from the current sequence when converted to protein.
+        Will return 6 frames (does include reverse complement frames)
 
-    def subs(self, sub):
+        :returns six frames
+        """
+        return set(self.get_frames() + Strand(self.get_reverse_complement()).get_frames())
+
+    def subs(self, sub: str):
+        """
+        Find all locations of the a sequence in the current sequence
+
+        :param sub sub-sequence to match
+
+        :returns list of locations where sub is present in sequence
+        """
         result = []
         seq = self.sequence
         while sub in seq:
@@ -144,6 +211,14 @@ class Strand:
 
 
 def hamming_distance(strand1: Strand, strand2: Strand):
+    """
+    Calculate the Hamming distance of both strands
+
+    :param strand1 Strand 1
+    :param strand2 Strand 2
+
+    :returns distance of sequence 1 to sequence 2
+    """
     sequence1 = strand1.sequence
     sequence2 = strand2.sequence
 
@@ -158,6 +233,13 @@ def hamming_distance(strand1: Strand, strand2: Strand):
 
 
 def get_strands(filename="input.txt"):
+    """
+    Returns a list of all sequences in the provided fasta format file as Strands
+
+    :param filename file to open (default input.txt)
+
+    :returns list of all strands
+    """
     file = open(filename, "r")
     strands = []
 
@@ -177,5 +259,31 @@ def get_strands(filename="input.txt"):
             buffer_data += line
 
     strands.append(Strand(buffer_data, buffer_title))
+
+    return strands
+
+
+def read_file(filename="input.txt", crosses_lines=False):
+    """
+    Returns a list of all sequences in the provided file as Strands
+
+    :param filename file to open
+    :param crosses_lines set if strands are separated by linebreaks. Different strands are separated by empty lines.
+
+    :returns list of all strands
+    """
+    strands = []
+    with open(filename, "r") as file:
+        buffer_data = ""
+        for line in file.readlines():
+            if crosses_lines is True:
+                if line.strip() == "":
+                    strands.append(Strand(buffer_data))
+                    buffer_data = ""
+                else:
+                    buffer_data += line.strip()
+            else:
+                if line.strip() != "":
+                    strands.append(Strand(line.strip()))
 
     return strands
