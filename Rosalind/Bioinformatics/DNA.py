@@ -1,3 +1,6 @@
+import sys
+from typing import List, Set
+
 translation = {
     "UUU": "F",
     "CUU": "L",
@@ -65,15 +68,37 @@ translation = {
     "GGG": "G"
 }
 
+reverse_translation = {
+    'L': ['CUU', 'CUC', 'UUA', 'CUA', 'UUG', 'CUG'],
+    'D': ['GAU', 'GAC'], 'K': ['AAA', 'AAG'],
+    'V': ['GUU', 'GUC', 'GUA', 'GUG'],
+    'Y': ['UAU', 'UAC'],
+    'H': ['CAU', 'CAC'],
+    'W': ['UGG'],
+    'I': ['AUU', 'AUC', 'AUA'],
+    'A': ['GCU', 'GCC', 'GCA', 'GCG'],
+    'Q': ['CAA', 'CAG'],
+    'E': ['GAA', 'GAG'],
+    'G': ['GGU', 'GGC', 'GGA', 'GGG'],
+    'P': ['CCU', 'CCC', 'CCA', 'CCG'],
+    'S': ['UCU', 'UCC', 'UCA', 'UCG', 'AGU', 'AGC'],
+    'M': ['AUG'], 'T': ['ACU', 'ACC', 'ACA', 'ACG'],
+    'R': ['CGU', 'CGC', 'CGA', 'AGA', 'CGG', 'AGG'],
+    'F': ['UUU', 'UUC'],
+    'Stop': ['UAA', 'UAG', 'UGA'],
+    'C': ['UGU', 'UGC'],
+    'N': ['AAU', 'AAC']
+}
+
 
 class Strand:
-    def __init__(self, sequence: str, title="", raw_type="DNA", protein=""):
+    def __init__(self, sequence="", title="", raw_type="DNA", protein=""):
         self.sequence = sequence.upper()
         self.raw_type = raw_type
         self.title = title
         self.protein = protein
 
-    def reverse(self):
+    def reverse(self) -> str:
         """"
         Reverses the sequence
 
@@ -82,7 +107,7 @@ class Strand:
         self.sequence = self.sequence[::-1]
         return self.sequence
 
-    def flip(self):
+    def flip(self) -> None:
         """"
         Flips the sequence from RNA to DNA and vice versa
 
@@ -97,7 +122,7 @@ class Strand:
 
         return self.sequence
 
-    def get_complement(self):
+    def get_complement(self) -> str:
         """
         Get the complemented string
         Does not modify sequence
@@ -109,7 +134,7 @@ class Strand:
         else:
             return "".join(["A" if char == "U" else "U" if char == "A" else "C" if char == "G" else "G" for char in self.sequence])
 
-    def get_reverse_complement(self):
+    def get_reverse_complement(self) -> str:
         """"
         Get the reversed complement
         does not modify sequence
@@ -118,22 +143,22 @@ class Strand:
         """
         return self.get_complement()[::-1]
 
-    def shift(self, amount=1):
+    def shift(self, amount=1) -> None:
         """
         Shift sequence by basepairs
         Used to obtain orf's
         """
         self.sequence = self.sequence[-amount:] + self.sequence[:-amount]
 
-    def gc_amount(self):
+    def gc_amount(self) -> float:
         """
         Calculate the GC amount
 
         :returns fraction of sequence containing G or C
         """
-        return (self.sequence.count("G") + self.sequence.count("C")) / len(self.sequence)
+        return sum(map(lambda x: 1 if x == "G" or x == "C" else 0, self.sequence)) / len(self.sequence)
 
-    def count_bases(self, base="ACGT"):
+    def count_bases(self, base="ACGT") -> List[int]:
         """"
         :param base base pairs to obtain info from, default = "ACGT"
 
@@ -142,7 +167,7 @@ class Strand:
         all_bases = "ACGT"
         return [self.sequence.count(code) for code in all_bases if code in base]
 
-    def to_protein(self, include_stop=False):
+    def to_protein(self, include_stop=False) -> str:
         """
         Create protein from the current sequence
         Will convert to RNA if type is DNA using flip()
@@ -159,7 +184,7 @@ class Strand:
                 self.protein = self.protein.replace("Stop", "")
             return self.protein
 
-    def get_frames(self):
+    def get_frames(self) -> List[str]:
         """
         Obtain all reading frames from the current sequence when converted to protein.
         Will return 3 frames (does not include reverse complement frames)
@@ -183,7 +208,7 @@ class Strand:
 
         return result
 
-    def get_orfs(self):
+    def get_orfs(self) -> Set[str]:
         """
         Obtain all reading open frames from the current sequence when converted to protein.
         Will return 6 frames (does include reverse complement frames)
@@ -192,7 +217,7 @@ class Strand:
         """
         return set(self.get_frames() + Strand(self.get_reverse_complement()).get_frames())
 
-    def subs(self, sub: str):
+    def subs(self, sub: str) -> List[int]:
         """
         Find all locations of the a sequence in the current sequence
 
@@ -209,8 +234,16 @@ class Strand:
         result = [sum(result[:i + 1]) for i, _ in enumerate(result)]
         return result
 
+    def remove_introns(self, introns: List[str]) -> str:
+        for intron in introns:
+            self.sequence = self.sequence.replace(intron, "")
+        return self.sequence
 
-def hamming_distance(strand1: Strand, strand2: Strand):
+    def __str__(self) -> str:
+        return (">" + self.title if self.title != "" else "") + (("\n" + self.sequence) if self.sequence != "" else "") + (("\n" + self.protein) if self.protein != "" else "")
+
+
+def hamming_distance(strand1: Strand, strand2: Strand) -> int:
     """
     Calculate the Hamming distance of both strands
 
@@ -232,7 +265,7 @@ def hamming_distance(strand1: Strand, strand2: Strand):
     return result
 
 
-def read_fasta_file(filename="input.txt"):
+def read_fasta_file(filename="input.txt", type="DNA") -> List[Strand]:
     """
     Returns a list of all sequences in the provided fasta format file as Strands
 
@@ -248,12 +281,15 @@ def read_fasta_file(filename="input.txt"):
     for entry in entries:
         label = entry[0]
         data = "".join(entry[1:])
-        strands.append(Strand(data, label))
+        if type == "protein":
+            strands.append(Strand(protein=data.strip(), title=label))
+        else:
+            strands.append(Strand(data.strip(), label, type))
 
     return strands
 
 
-def read_file(filename="input.txt", crosses_lines=False):
+def read_file(filename="input.txt", crosses_lines=False, type="DNA") -> List[Strand]:
     """
     Returns a list of all sequences in the provided file as Strands
 
@@ -271,6 +307,65 @@ def read_file(filename="input.txt", crosses_lines=False):
         strands = [Strand(strand) for strand in entries[0]]
     else:
         for entry in entries:
-            strands.append(Strand("".join(entry)))
+            if type == "protein":
+                strands.append(Strand(protein="".join(entry).strip()))
+            else:
+                strands.append(Strand("".join(entry).strip(), raw_type=type))
 
     return strands
+
+
+def motif_to_regex(motif: str) -> str:
+    return r"(?=(" + motif.replace("{", "[^").replace("}", "]") + "))"
+
+
+def get_sequence(strand: Strand) -> str:
+    return strand.sequence
+
+
+def transition_transversion_ratio(Strand1: Strand, Strand2: Strand) -> float:
+    transitions = 0
+    transversion = 0
+
+    sequence_1 = Strand1.sequence
+    sequence_2 = Strand2.sequence
+
+    for bp1, bp2 in zip(sequence_1, sequence_2):
+        if bp1 != bp2:
+            if (bp1 == "A" and bp2 == "G") or (bp1 == "G" and bp2 == "A") or (bp1 == "T" and bp2 == "C") or (bp1 == "C" and bp2 == "T"):
+                transitions += 1
+            else:
+                transversion += 1
+
+    return transitions / transversion
+
+
+def get_superstring(strands: List[str]) -> str:
+    highest_overlap = []
+    n = len(strands)
+    while len(strands) > 1:
+        i = n - len(strands)
+
+        sys.stdout.write('\r')
+        sys.stdout.write("[{:{}}] {:.1f}%".format("=" * i, n - 1, (100 / (n - 1) * i)))
+        sys.stdout.flush()
+
+        highest_overlap = [0, "", "", ""]
+        for strand_1 in strands:
+            for strand_2 in strands:
+                if strand_2 == strand_1:
+                    continue
+
+                overlap = 0
+                for length in range(len(strand_1)):
+                    if strand_2.startswith(strand_1[-length:]):
+                        overlap = length
+
+                if overlap > highest_overlap[0]:
+                    highest_overlap = [overlap, strand_1[:-overlap] + strand_2, strand_1, strand_2]
+
+        strands.append(highest_overlap[1])
+        strands.remove(highest_overlap[2])
+        strands.remove(highest_overlap[3])
+    sys.stdout.write('\r')
+    return highest_overlap[1]
