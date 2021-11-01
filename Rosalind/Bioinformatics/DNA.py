@@ -1,3 +1,9 @@
+"""
+Author: Martijn Gobes
+
+Provides a myriad of helper functions for sequence related functions.
+"""
+
 import sys
 from typing import List, Set
 
@@ -92,7 +98,18 @@ reverse_translation = {
 
 
 class Strand:
+    """
+    Creates a strands class from a sequence of basepairs or protein
+    """
     def __init__(self, sequence="", title="", raw_type="DNA", protein=""):
+        """
+        Returns a strand object
+
+        :param sequence initialised sequence
+        :param title initialised title
+        :param raw_type initialised type (DNA or RNA)
+        :param protein initialised protein string
+        """
         self.sequence = sequence.upper()
         self.raw_type = raw_type
         self.title = title
@@ -131,8 +148,8 @@ class Strand:
         """
         if self.raw_type == "DNA":
             return "".join(["A" if char == "T" else "T" if char == "A" else "C" if char == "G" else "G" for char in self.sequence])
-        else:
-            return "".join(["A" if char == "U" else "U" if char == "A" else "C" if char == "G" else "G" for char in self.sequence])
+        # So it is RNA
+        return "".join(["A" if char == "U" else "U" if char == "A" else "C" if char == "G" else "G" for char in self.sequence])
 
     def get_reverse_complement(self) -> str:
         """"
@@ -156,7 +173,7 @@ class Strand:
 
         :returns fraction of sequence containing G or C
         """
-        return sum(map(lambda x: 1 if x == "G" or x == "C" else 0, self.sequence)) / len(self.sequence)
+        return sum(map(lambda x: 1 if x in ("G", "C") else 0, self.sequence)) / len(self.sequence)
 
     def count_bases(self, base="ACGT") -> List[int]:
         """"
@@ -178,11 +195,11 @@ class Strand:
         if self.raw_type == "DNA":
             self.flip()
             return self.to_protein(include_stop)
-        else:
-            self.protein = "".join([translation.get(self.sequence[i: i + 3], "") for i in range(0, len(self.sequence), 3)])
-            if not include_stop:
-                self.protein = self.protein.replace("Stop", "")
-            return self.protein
+
+        self.protein = "".join([translation.get(self.sequence[i: i + 3], "") for i in range(0, len(self.sequence), 3)])
+        if not include_stop:
+            self.protein = self.protein.replace("Stop", "")
+        return self.protein
 
     def get_frames(self) -> List[str]:
         """
@@ -235,11 +252,19 @@ class Strand:
         return result
 
     def remove_introns(self, introns: List[str]) -> str:
+        """
+        Remove all the strings in introns from its sequence.
+        Modifies the sequence
+
+        :param introns list of strings to remove
+
+        :returns the modified internal sequence
+        """
         for intron in introns:
             self.sequence = self.sequence.replace(intron, "")
         return self.sequence
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # Helper function to more easily print what is in the Strand class
         return (">" + self.title if self.title != "" else "") + (("\n" + self.sequence) if self.sequence != "" else "") + (("\n" + self.protein) if self.protein != "" else "")
 
 
@@ -259,80 +284,106 @@ def hamming_distance(strand1: Strand, strand2: Strand) -> int:
         raise Exception("sequences must have equal length")
     result = 0
 
-    for i in range(0, len(sequence1)):
-        if sequence1[i] != sequence2[i]:
+    for i, value in enumerate(sequence1):
+        if value != sequence2[i]:
             result += 1
     return result
 
 
-def read_fasta_file(filename="input.txt", type="DNA") -> List[Strand]:
+def read_fasta_file(filename="input.txt", sequence_type="DNA") -> List[Strand]:
     """
     Returns a list of all sequences in the provided fasta format file as Strands
 
-    :param filename file to open (default input.txt)
+    :param filename file to open
+    :param sequence_type what type the input is (DNA, RNA or protein)
 
     :returns list of all strands
     """
     strands = []
 
-    with open(filename, "r") as file:
+    with open(filename, "r", encoding="utf-8") as file:
         entries = [entry.split("\n") for entry in file.read().split(">")[1:]]
 
     for entry in entries:
         label = entry[0]
         data = "".join(entry[1:])
-        if type == "protein":
+        if sequence_type == "protein":
             strands.append(Strand(protein=data.strip(), title=label))
         else:
-            strands.append(Strand(data.strip(), label, type))
+            strands.append(Strand(data.strip(), label, sequence_type))
 
     return strands
 
 
-def read_file(filename="input.txt", crosses_lines=False, type="DNA") -> List[Strand]:
+def read_file(filename="input.txt", crosses_lines=False, sequence_type="DNA") -> List[Strand]:
     """
     Returns a list of all sequences in the provided file as Strands
 
     :param filename file to open
     :param crosses_lines set if strands are separated by linebreaks. Different strands are separated by empty lines.
+    :param sequence_type what type the input is (DNA, RNA or protein)
 
     :returns list of all strands
     """
     strands = []
 
-    with open(filename, "r") as file:
+    with open(filename, "r", encoding="utf-8") as file:
         entries = [entry.split("\n") for entry in file.read().split("\n\n")]
 
     if not crosses_lines:
         strands = [Strand(strand) for strand in entries[0]]
     else:
         for entry in entries:
-            if type == "protein":
+            if sequence_type == "protein":
                 strands.append(Strand(protein="".join(entry).strip()))
             else:
-                strands.append(Strand("".join(entry).strip(), raw_type=type))
+                strands.append(Strand("".join(entry).strip(), raw_type=sequence_type))
 
     return strands
 
 
 def motif_to_regex(motif: str) -> str:
+    """
+    Takes a basepair motif and makes it into a regex string
+    Detects overlapping motifs
+
+    :param motif to convert
+
+    :returns regex string
+    """
     return r"(?=(" + motif.replace("{", "[^").replace("}", "]") + "))"
 
 
 def get_sequence(strand: Strand) -> str:
+    """
+    Helper function to use in mapping
+    Returns the sequence inside the strand
+
+    :param strand Strand
+
+    :returns the sequence of the strand
+    """
     return strand.sequence
 
 
-def transition_transversion_ratio(Strand1: Strand, Strand2: Strand) -> float:
+def transition_transversion_ratio(strand1: Strand, strand2: Strand) -> float:
+    """
+    Calculates the transition/transversion ratio for the provided strands
+
+    :param strand1 Strand 1
+    :param strand2 Strand 2
+
+    :returns the ratio as float
+    """
     transitions = 0
     transversion = 0
 
-    sequence_1 = Strand1.sequence
-    sequence_2 = Strand2.sequence
+    sequence_1 = strand1.sequence
+    sequence_2 = strand2.sequence
 
     for bp1, bp2 in zip(sequence_1, sequence_2):
         if bp1 != bp2:
-            if (bp1 == "A" and bp2 == "G") or (bp1 == "G" and bp2 == "A") or (bp1 == "T" and bp2 == "C") or (bp1 == "C" and bp2 == "T"):
+            if (bp1, bp2) == ("A", "G") or (bp1, bp2) == ("G", "A") or (bp1, bp2) == ("T", "C") or (bp1, bp2) == ("C", "T"):
                 transitions += 1
             else:
                 transversion += 1
@@ -341,13 +392,21 @@ def transition_transversion_ratio(Strand1: Strand, Strand2: Strand) -> float:
 
 
 def get_superstring(strands: List[str]) -> str:
+    """
+    Produces the shortest superstring for the provided list of strings.
+    This is optimised for the Rosalind problem and is NOT a general solution.
+
+    :param strands list of strings to overlap
+
+    :returns superstring of strands
+    """
     highest_overlap = []
-    n = len(strands)
+    total_length = len(strands)
     while len(strands) > 1:
-        i = n - len(strands)
+        i = total_length - len(strands)
 
         sys.stdout.write('\r')
-        sys.stdout.write("[{:{}}] {:.1f}%".format("=" * i, n - 1, (100 / (n - 1) * i)))
+        sys.stdout.write(f"[{'=' * i:{total_length - 1}}] {(100 / (total_length- 1) * i):.1f}%")
         sys.stdout.flush()
 
         highest_overlap = [0, "", "", ""]
@@ -369,3 +428,25 @@ def get_superstring(strands: List[str]) -> str:
         strands.remove(highest_overlap[3])
     sys.stdout.write('\r')
     return highest_overlap[1]
+
+
+def get_consensus_strand(strands: List[str]) -> str:
+    """
+    Produces a consensus strand for all sequences in strands
+
+    :param strands list of strings, length much b equal
+
+    :returns consensus string
+    """
+    positional = ["".join(_) for _ in zip(*strands)]
+
+    data = []
+    for pos in positional:
+        data.append((pos.count("A"), pos.count("C"), pos.count("G"), pos.count("T")))
+
+    consensus_string = ""
+    for entry in data:
+        max_entry = max(entry)
+        consensus_string += "A" if max_entry == entry[0] else "C" if max_entry == entry[1] else "G" if max_entry == entry[2] else "T"
+
+    return consensus_string
